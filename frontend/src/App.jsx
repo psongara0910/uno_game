@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 
 const COLORS = ['red', 'yellow', 'green', 'blue'];
@@ -7,6 +7,14 @@ const COLOR_LABELS = {
   yellow: 'Yellow',
   green: 'Green',
   blue: 'Blue'
+};
+
+const UNO_COLORS = {
+  red: '#e53935',
+  yellow: '#f6c026',
+  green: '#2abf6a',
+  blue: '#2f7bf2',
+  black: '#111'
 };
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
@@ -20,6 +28,12 @@ function App() {
   const [error, setError] = useState('');
   const [toasts, setToasts] = useState([]);
   const [colorPicker, setColorPicker] = useState({ open: false, cardId: null });
+  const [animatingCardId, setAnimatingCardId] = useState(null);
+  const [drawAnimating, setDrawAnimating] = useState(false);
+  const [penaltyPops, setPenaltyPops] = useState({});
+  const [seatShakes, setSeatShakes] = useState({});
+  const [cardRain, setCardRain] = useState({});
+  const stateRef = useRef(null);
 
   const addToast = (message) => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -39,7 +53,14 @@ function App() {
       setState(view);
       setError('');
     });
-    s.on('toast', (msg) => addToast(msg));
+    s.on('toast', (msg) => {
+      addToast(msg);
+      const penalty = parsePenaltyToast(msg, stateRef.current?.players || []);
+      if (penalty) {
+        pushPenaltyPop(penalty.playerId, penalty.value, setPenaltyPops, setSeatShakes);
+        spawnCardRain(penalty.playerId, penalty.value, setCardRain);
+      }
+    });
     s.on('errorMessage', (msg) => setError(msg));
 
     return () => s.disconnect();
@@ -105,6 +126,10 @@ function App() {
     if (state.code) localStorage.setItem('uno_code', state.code);
   }, [state?.you?.id, state?.code]);
 
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
   const isHost = state?.hostId && state?.hostId === meId;
 
   const handleStart = () => {
@@ -114,7 +139,12 @@ function App() {
   const handleAddBot = () => emitAction('addBot', { code: state.code, playerId: meId });
   const handleRemoveBot = () => emitAction('removeBot', { code: state.code, playerId: meId });
 
-  const handleDraw = () => emitAction('drawCard', { code: state.code, playerId: meId });
+  const handleDraw = () => {
+    if (!canAct || drawnCardId) return;
+    setDrawAnimating(true);
+    setTimeout(() => setDrawAnimating(false), 420);
+    emitAction('drawCard', { code: state.code, playerId: meId });
+  };
   const handlePass = () => emitAction('passTurn', { code: state.code, playerId: meId });
   const handleCallUno = () => emitAction('callUNO', { code: state.code, playerId: meId });
   const handleCatchUno = () => emitAction('catchUNO', { code: state.code, playerId: meId });
@@ -143,6 +173,8 @@ function App() {
   const handlePlayCard = (card) => {
     if (!canAct) return;
     if (!isPlayableClient(card)) return;
+    setAnimatingCardId(card.id);
+    setTimeout(() => setAnimatingCardId(null), 420);
     if (card.type === 'wild' || card.type === 'wild4') {
       setColorPicker({ open: true, cardId: card.id });
       return;
@@ -158,6 +190,15 @@ function App() {
       chosenColor: color
     });
     setColorPicker({ open: false, cardId: null });
+  };
+
+  const handleCopy = async (code) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      addToast('Invite code copied!');
+    } catch (err) {
+      addToast('Copy failed');
+    }
   };
 
   const renderHome = () => {
@@ -214,11 +255,16 @@ function App() {
             <h2>Lobby {state.code}</h2>
             <p className="muted">Share this invite code with friends.</p>
           </div>
-          <div className="badge">{players.length}/4 Players</div>
+          <div className="lobby-actions">
+            <div className="badge">{players.length}/4 Players</div>
+            <button className="copy" onClick={() => handleCopy(state.code)}>
+              Copy Code
+            </button>
+          </div>
         </header>
         <div className="seat-grid">
           {players.map((p) => (
-            <div key={p.id} className={`seat ${p.isBot ? 'bot' : ''}`}>
+            <div key={p.id} className={`seat-card ${p.isBot ? 'bot' : ''}`}>
               <div className="seat-name">{p.name}</div>
               <div className="seat-sub">
                 {p.isHost ? 'Host' : p.isBot ? 'Bot' : p.connected ? 'Online' : 'Disconnected'}
@@ -226,7 +272,7 @@ function App() {
             </div>
           ))}
           {Array.from({ length: emptySeats }).map((_, idx) => (
-            <div key={`empty-${idx}`} className="seat empty">
+            <div key={`empty-${idx}`} className="seat-card empty">
               Empty Seat
             </div>
           ))}
@@ -265,83 +311,145 @@ function App() {
   const renderGame = () => {
     const players = state.players || [];
     const currentPlayer = players[game.currentPlayerIndex];
-    const directionArrow = game.direction === 1 ? '→' : '←';
+    const directionArrow = game.direction === 1 ? '↻' : '↺';
 
     const showChallenge = pendingChallenge && pendingChallenge.challengerId === meId;
     const showCallUno = unoPending && unoPending.playerId === meId;
     const showCatchUno = unoPending && unoPending.playerId !== meId;
 
+    const seatMap = getSeatMap(players, myIndex);
+
     return (
       <div className="screen game">
-        <header className="game-header">
-          <div>
-            <div className="badge">Lobby {state.code}</div>
-            <div className="status">
-              {myTurn ? 'Your turn' : `${currentPlayer?.name || 'Player'}'s turn`}
-            </div>
+        <header className="game-topbar">
+          <div className="lobby-code">
+            <span>Lobby</span>
+            <strong>{state.code}</strong>
+            <button className="copy" onClick={() => handleCopy(state.code)}>
+              Copy
+            </button>
           </div>
-          <div className="direction">Direction {directionArrow}</div>
+          <div className={`turn-pill ${myTurn ? 'active' : ''}`}>
+            {myTurn ? 'Your turn' : `${currentPlayer?.name || 'Player'}'s turn`}
+          </div>
+          <div className="direction-indicator">{directionArrow}</div>
         </header>
 
-        <div className="opponents">
-          {players.map((p, idx) => (
-            <div
-              key={p.id}
-              className={`opponent ${idx === game.currentPlayerIndex ? 'active' : ''}`}
-            >
-              <div className="opponent-name">{p.name}</div>
-              <div className="opponent-count">{p.handCount} cards</div>
-            </div>
-          ))}
-        </div>
+        <div className="table">
+          <Seat
+            position="north"
+            player={seatMap.north}
+            isActive={seatMap.north?.index === game.currentPlayerIndex}
+            unoPendingId={unoPending?.playerId}
+            penaltyPops={penaltyPops}
+            seatShakes={seatShakes}
+            cardRain={cardRain}
+          />
+          <Seat
+            position="west"
+            player={seatMap.west}
+            isActive={seatMap.west?.index === game.currentPlayerIndex}
+            unoPendingId={unoPending?.playerId}
+            penaltyPops={penaltyPops}
+            seatShakes={seatShakes}
+            cardRain={cardRain}
+          />
+          <Seat
+            position="east"
+            player={seatMap.east}
+            isActive={seatMap.east?.index === game.currentPlayerIndex}
+            unoPendingId={unoPending?.playerId}
+            penaltyPops={penaltyPops}
+            seatShakes={seatShakes}
+            cardRain={cardRain}
+          />
+          <Seat
+            position="south"
+            player={seatMap.south}
+            isActive={seatMap.south?.index === game.currentPlayerIndex}
+            unoPendingId={unoPending?.playerId}
+            isYou
+            penaltyPops={penaltyPops}
+            seatShakes={seatShakes}
+            cardRain={cardRain}
+          />
 
-        <div className="board">
-          <div className="discard">
-            <div className="label">Discard</div>
-            <Card card={game.discardTop} large />
-          </div>
-          <div className="draw">
-            <div className="label">Draw Pile</div>
-            <button className="draw-button" onClick={handleDraw} disabled={!canAct || !!drawnCardId}>
-              Draw ({game.drawDeckCount})
-            </button>
-            <div className="pill">Discard {game.discardPileCount}</div>
-          </div>
-          <div className="color-indicator">
-            <div className={`color-dot ${game.currentColor}`} />
-            <span>Active: {COLOR_LABELS[game.currentColor] || 'None'}</span>
-          </div>
-        </div>
+          <div className={`center-area ${game.currentColor || 'none'}`}>
+            <div className="pile-row">
+              <div className="pile-stack discard-stack">
+                <div className="pile-shadow" />
+                <div className="pile-shadow shadow-2" />
+                <UnoCard card={game.discardTop} size="large" />
+              </div>
 
-        <div className="actions-row">
-          <button onClick={handlePass} disabled={!canAct || !drawnCardId}>
-            Pass
-          </button>
-          <button onClick={handleCallUno} disabled={!showCallUno}>
-            UNO
-          </button>
-          <button onClick={handleCatchUno} disabled={!showCatchUno}>
-            Catch UNO
-          </button>
-          {showChallenge && (
-            <>
-              <button className="warn" onClick={handleChallenge}>
-                Challenge
+              <button
+                className={`pile-stack draw-stack ${drawAnimating ? 'drawing' : ''}`}
+                onClick={handleDraw}
+                disabled={!canAct || !!drawnCardId}
+              >
+                <CardBack className="stacked" />
+                <CardBack className="stacked offset-1" />
+                <CardBack className="stacked offset-2" />
+                <span className="pile-label">Draw {game.drawDeckCount}</span>
               </button>
-              <button onClick={handleDeclineChallenge}>No Challenge</button>
-            </>
-          )}
+            </div>
+
+            <div className="center-meta">
+              <div className={`active-color ${game.currentColor}`}>
+                <span className="dot" />
+                {COLOR_LABELS[game.currentColor] || 'None'}
+              </div>
+              <div className="direction-chip">{directionArrow}</div>
+              <div className="pile-counts">Discard {game.discardPileCount}</div>
+            </div>
+          </div>
         </div>
 
-        <div className="hand">
-          {(state.hand || []).map((card) => (
-            <Card
-              key={card.id}
-              card={card}
-              playable={isPlayableClient(card)}
-              onClick={() => handlePlayCard(card)}
-            />
-          ))}
+        <div className="hand-dock">
+          <div className="hand">
+            {(state.hand || []).map((card) => {
+              const playable = isPlayableClient(card);
+              const dim = myTurn && !playable;
+              return (
+                <UnoCard
+                  key={card.id}
+                  card={card}
+                  playable={playable}
+                  dim={dim}
+                  animate={animatingCardId === card.id}
+                  onClick={() => handlePlayCard(card)}
+                />
+              );
+            })}
+          </div>
+          <div className="action-bar">
+            <button className="action" onClick={handleDraw} disabled={!canAct || !!drawnCardId}>
+              Draw
+            </button>
+            <button className="action" onClick={handlePass} disabled={!canAct || !drawnCardId}>
+              Pass
+            </button>
+            {showCallUno && (
+              <button className="action primary" onClick={handleCallUno}>
+                UNO
+              </button>
+            )}
+            {showCatchUno && (
+              <button className="action warn" onClick={handleCatchUno}>
+                Catch UNO
+              </button>
+            )}
+            {showChallenge && (
+              <>
+                <button className="action warn" onClick={handleChallenge}>
+                  Challenge
+                </button>
+                <button className="action" onClick={handleDeclineChallenge}>
+                  No Challenge
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -389,37 +497,283 @@ function App() {
   );
 }
 
-function Card({ card, playable, onClick, large }) {
-  if (!card) {
-    return (
-      <div className={`card empty ${large ? 'large' : ''}`}>
-        <div className="card-face">?</div>
-      </div>
-    );
-  }
-
-  const label = getCardLabel(card);
-  const classes = ['card', card.color || 'wild', large ? 'large' : '', playable ? 'playable' : '']
-    .filter(Boolean)
-    .join(' ');
-
+function Seat({ position, player, isActive, unoPendingId, isYou, penaltyPops, seatShakes, cardRain }) {
+  if (!player) return null;
+  const showUno = unoPendingId === player.id;
+  const pops = penaltyPops?.[player.id] || [];
+  const shaking = seatShakes?.[player.id];
+  const rain = cardRain?.[player.id] || [];
   return (
-    <div className={classes} onClick={onClick} role={onClick ? 'button' : undefined}>
-      <div className="card-face">
-        <div className="card-value">{label}</div>
+    <div className={`seat ${position} ${isActive ? 'active' : ''} ${isYou ? 'you' : ''} ${shaking ? 'shake' : ''}`}>
+      <div className="seat-inner">
+        <div className="seat-header">
+          <span className="seat-name">{player.name}</span>
+          {isYou && <span className="seat-you">You</span>}
+        </div>
+        {!isYou && (
+          <OpponentHandBacks count={player.handCount} orientation={position} />
+        )}
+        {!isYou && <div className="count-badge">{player.handCount}</div>}
+        {showUno && <div className="uno-badge">UNO!</div>}
+        {isYou && isActive && <div className="turn-badge">Your turn</div>}
+        {pops.map((pop, idx) => (
+          <div key={pop.id} className={`penalty-pop ${pop.tone}`} style={{ '--pop-index': idx }}>
+            +{pop.value}
+          </div>
+        ))}
+        {rain.length > 0 && (
+          <div className="card-rain">
+            {rain.map((drop) => (
+              <div
+                key={drop.id}
+                className="rain-card"
+                style={{
+                  '--rain-x': `${drop.x}%`,
+                  '--rain-delay': `${drop.delay}ms`,
+                  '--rain-duration': `${drop.duration}ms`
+                }}
+              >
+                <CardBack className="rain-back" />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function getCardLabel(card) {
-  if (card.type === 'number') return card.value;
-  if (card.type === 'skip') return 'Skip';
-  if (card.type === 'reverse') return 'Reverse';
+function OpponentHandBacks({ count, orientation }) {
+  const visible = Math.min(count, 12);
+  return (
+    <div className={`opponent-backs ${orientation}`}>
+      {Array.from({ length: visible }).map((_, idx) => (
+        <CardBack key={idx} className="mini" />
+      ))}
+      {count > visible && <div className="extra-badge">+{count - visible}</div>}
+    </div>
+  );
+}
+
+function UnoCard({ card, size, playable, dim, animate, onClick }) {
+  if (!card) {
+    return (
+      <div className={`uno-card empty ${size || ''}`}>
+        <div className="card-face">?</div>
+      </div>
+    );
+  }
+
+  const classes = ['uno-card', size || '', playable ? 'playable' : '', dim ? 'dim' : '', animate ? 'played' : '']
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <div className={classes} onClick={onClick} role={onClick ? 'button' : undefined}>
+      <CardFace card={card} />
+    </div>
+  );
+}
+
+function CardFace({ card }) {
+  const baseColor = UNO_COLORS[card.color] || UNO_COLORS.black;
+  const isWild = card.type === 'wild' || card.type === 'wild4';
+  const corner = getCornerLabel(card);
+  const center = getCenterLabel(card);
+
+  return (
+    <svg className="card-svg" viewBox="0 0 200 300" aria-hidden="true">
+      <defs>
+        <linearGradient id="cardGloss" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="rgba(255,255,255,0.35)" />
+          <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+        </linearGradient>
+      </defs>
+      <rect x="6" y="6" width="188" height="288" rx="22" fill={baseColor} stroke="#fff" strokeWidth="6" />
+      <ellipse cx="100" cy="150" rx="85" ry="120" fill="rgba(255,255,255,0.18)" transform="rotate(-20 100 150)" />
+      <ellipse cx="100" cy="150" rx="60" ry="95" fill="rgba(255,255,255,0.12)" transform="rotate(-20 100 150)" />
+      <rect x="6" y="6" width="188" height="288" rx="22" fill="url(#cardGloss)" />
+
+      {isWild && (
+        <g>
+          <circle cx="70" cy="120" r="18" fill={UNO_COLORS.red} />
+          <circle cx="130" cy="120" r="18" fill={UNO_COLORS.yellow} />
+          <circle cx="70" cy="180" r="18" fill={UNO_COLORS.green} />
+          <circle cx="130" cy="180" r="18" fill={UNO_COLORS.blue} />
+        </g>
+      )}
+
+      <text x="26" y="44" className="card-index">
+        {corner}
+      </text>
+      <text x="174" y="258" className="card-index" transform="rotate(180 174 258)">
+        {corner}
+      </text>
+
+      <g className="card-center">
+        {card.type === 'skip' && (
+          <g>
+            <circle cx="100" cy="150" r="34" fill="none" stroke="#fff" strokeWidth="8" />
+            <line x1="76" y1="174" x2="124" y2="126" stroke="#fff" strokeWidth="10" />
+          </g>
+        )}
+        {card.type === 'reverse' && (
+          <text x="100" y="166" className="card-text" textAnchor="middle">
+            ↺↻
+          </text>
+        )}
+        {card.type === 'draw2' && (
+          <text x="100" y="170" className="card-text" textAnchor="middle">
+            +2
+          </text>
+        )}
+        {card.type === 'wild' && (
+          <text x="100" y="170" className="card-text" textAnchor="middle">
+            WILD
+          </text>
+        )}
+        {card.type === 'wild4' && (
+          <text x="100" y="170" className="card-text" textAnchor="middle">
+            +4
+          </text>
+        )}
+        {card.type === 'number' && (
+          <text x="100" y="170" className="card-text" textAnchor="middle">
+            {center}
+          </text>
+        )}
+      </g>
+    </svg>
+  );
+}
+
+function CardBack({ className = '' }) {
+  return (
+    <div className={`card-back ${className}`}>
+      <svg className="card-svg" viewBox="0 0 200 300" aria-hidden="true">
+        <defs>
+          <linearGradient id="backGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#ff5b5b" />
+            <stop offset="100%" stopColor="#b60f2a" />
+          </linearGradient>
+        </defs>
+        <rect x="6" y="6" width="188" height="288" rx="22" fill="url(#backGrad)" stroke="#fff" strokeWidth="6" />
+        <ellipse cx="100" cy="150" rx="85" ry="120" fill="rgba(255,255,255,0.2)" transform="rotate(-20 100 150)" />
+        <ellipse cx="100" cy="150" rx="60" ry="95" fill="rgba(255,255,255,0.15)" transform="rotate(-20 100 150)" />
+        <text x="100" y="175" className="card-back-text" textAnchor="middle">
+          UNO
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+function getCornerLabel(card) {
+  if (card.type === 'number') return String(card.value);
+  if (card.type === 'skip') return '⦸';
+  if (card.type === 'reverse') return '↺';
   if (card.type === 'draw2') return '+2';
-  if (card.type === 'wild') return 'Wild';
+  if (card.type === 'wild') return 'W';
   if (card.type === 'wild4') return '+4';
   return '';
+}
+
+function getCenterLabel(card) {
+  if (card.type === 'number') return String(card.value);
+  return '';
+}
+
+function getSeatMap(players, myIndex) {
+  if (!players || players.length === 0 || myIndex < 0) {
+    return { south: null, north: null, west: null, east: null };
+  }
+  const map = {
+    south: { ...players[myIndex], index: myIndex }
+  };
+  const positions = ['west', 'north', 'east'];
+  for (let offset = 1; offset < players.length; offset += 1) {
+    const pos = positions[offset - 1] || 'east';
+    const index = (myIndex + offset) % players.length;
+    map[pos] = { ...players[index], index };
+  }
+  return {
+    south: map.south,
+    north: map.north || null,
+    west: map.west || null,
+    east: map.east || null
+  };
+}
+
+function parsePenaltyToast(message, players) {
+  if (!message) return null;
+  const match = message.match(/^(.+?)(?: challenged and| forgot UNO and)? draws (\d+)/i);
+  if (!match) return null;
+  const value = Number(match[2]);
+  if (!Number.isFinite(value) || value < 2) return null;
+  const name = match[1].trim();
+  const player = players.find((p) => p.name === name);
+  if (!player) return null;
+  return { playerId: player.id, value };
+}
+
+function pushPenaltyPop(playerId, value, setPenaltyPops, setSeatShakes) {
+  const id = `${Date.now()}-${Math.random()}`;
+  const tone = value >= 4 ? 'pop-red' : 'pop-yellow';
+  setPenaltyPops((prev) => {
+    const current = prev[playerId] || [];
+    return { ...prev, [playerId]: [...current, { id, value, tone }] };
+  });
+  if (setSeatShakes) {
+    setSeatShakes((prev) => ({ ...prev, [playerId]: id }));
+  }
+  setTimeout(() => {
+    setPenaltyPops((prev) => {
+      const current = prev[playerId] || [];
+      const next = current.filter((pop) => pop.id !== id);
+      if (next.length === 0) {
+        const { [playerId]: _removed, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [playerId]: next };
+    });
+  }, 1400);
+
+  if (setSeatShakes) {
+    setTimeout(() => {
+      setSeatShakes((prev) => {
+        if (prev[playerId] !== id) return prev;
+        const { [playerId]: _removed, ...rest } = prev;
+        return rest;
+      });
+    }, 520);
+  }
+}
+
+function spawnCardRain(playerId, value, setCardRain) {
+  const count = Math.min(8, Math.max(3, value));
+  const drops = Array.from({ length: count }).map(() => ({
+    id: `${Date.now()}-${Math.random()}`,
+    x: Math.floor(20 + Math.random() * 60),
+    delay: Math.floor(Math.random() * 240),
+    duration: Math.floor(900 + Math.random() * 400)
+  }));
+
+  setCardRain((prev) => {
+    const current = prev[playerId] || [];
+    return { ...prev, [playerId]: [...current, ...drops] };
+  });
+
+  setTimeout(() => {
+    setCardRain((prev) => {
+      const current = prev[playerId] || [];
+      const next = current.filter((item) => !drops.some((drop) => drop.id === item.id));
+      if (next.length === 0) {
+        const { [playerId]: _removed, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [playerId]: next };
+    });
+  }, 1600);
 }
 
 export default App;
