@@ -311,7 +311,6 @@ function App() {
   const renderGame = () => {
     const players = state.players || [];
     const currentPlayer = players[game.currentPlayerIndex];
-    const directionArrow = game.direction === 1 ? '↻' : '↺';
 
     const showChallenge = pendingChallenge && pendingChallenge.challengerId === meId;
     const showCallUno = unoPending && unoPending.playerId === meId;
@@ -332,7 +331,6 @@ function App() {
           <div className={`turn-pill ${myTurn ? 'active' : ''}`}>
             {myTurn ? 'Your turn' : `${currentPlayer?.name || 'Player'}'s turn`}
           </div>
-          <div className="direction-indicator">{directionArrow}</div>
         </header>
 
         <div className="table">
@@ -389,7 +387,6 @@ function App() {
                   <CardBack className="stacked" />
                   <CardBack className="stacked offset-1" />
                   <CardBack className="stacked offset-2" />
-                  <span className="pile-label">Draw {game.drawDeckCount}</span>
                 </button>
               </div>
 
@@ -398,8 +395,6 @@ function App() {
                   <span className="dot" />
                   {COLOR_LABELS[game.currentColor] || 'None'}
                 </div>
-                <div className="direction-chip">{directionArrow}</div>
-                <div className="pile-counts">Discard {game.discardPileCount}</div>
               </div>
             </div>
           </div>
