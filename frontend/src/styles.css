@@ -460,6 +460,7 @@ input {
   justify-content: center;
   gap: 1rem;
   z-index: 3;
+  transform: translateY(var(--centerShiftY));
 }
 
 .play-area {
@@ -469,7 +470,6 @@ input {
   justify-content: center;
   gap: clamp(6px, 1.6vw, 12px);
   width: min(100%, 340px);
-  transform: translateY(var(--centerShiftY));
 }
 
 .center-area::after {
@@ -859,7 +859,7 @@ input {
 
   .table {
     height: 50vh;
-    --cardW: clamp(42px, 15vw, 60px);
+    --cardW: clamp(40px, 14vw, 58px);
     --cardH: calc(var(--cardW) * 1.45);
     --pileGap: clamp(10px, 4vw, 16px);
     --stackOffset: clamp(2px, 1.2vw, 6px);
@@ -934,12 +934,25 @@ input {
   }
 }
 
+@media (max-width: 900px) and (orientation: portrait) {
+  .table {
+    --centerShiftY: clamp(22px, 5vh, 60px);
+    --bottomInfoShiftY: clamp(4px, 1vh, 10px);
+  }
+}
+
 @media (max-width: 600px) and (orientation: portrait) {
   .table {
-    --centerShiftY: clamp(20px, 4vh, 46px);
-    --bottomInfoShiftY: clamp(10px, 2.4vh, 22px);
+    --centerShiftY: clamp(28px, 6vh, 72px);
+    --bottomInfoShiftY: clamp(4px, 1.2vh, 10px);
   }
 
+  .direction-indicator {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
   .direction-indicator {
     display: none;
   }
