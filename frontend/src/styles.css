@@ -248,6 +248,15 @@ input {
   background: radial-gradient(circle at 40% 30%, var(--felt-light), var(--felt-mid) 45%, var(--felt-dark) 85%);
   box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.45), 0 20px 40px rgba(0, 0, 0, 0.4);
   overflow: hidden;
+  padding: clamp(8px, 2vw, 18px);
+  padding-top: calc(clamp(8px, 2vw, 18px) + env(safe-area-inset-top));
+  padding-bottom: calc(clamp(8px, 2vw, 18px) + env(safe-area-inset-bottom));
+  padding-left: calc(clamp(8px, 2vw, 18px) + env(safe-area-inset-left));
+  padding-right: calc(clamp(8px, 2vw, 18px) + env(safe-area-inset-right));
+  --cardW: clamp(52px, 14vw, 88px);
+  --cardH: calc(var(--cardW) * 1.45);
+  --pileGap: clamp(10px, 3vw, 22px);
+  --stackOffset: clamp(4px, 1.2vw, 10px);
 }
 
 .table::before {
@@ -451,6 +460,15 @@ input {
   z-index: 3;
 }
 
+.play-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 1.6vw, 12px);
+  width: min(100%, 340px);
+}
+
 .center-area::after {
   content: '';
   position: absolute;
@@ -480,7 +498,7 @@ input {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(1rem, 6vw, 2.4rem);
+  gap: var(--pileGap);
   position: relative;
   z-index: 2;
   width: 100%;
@@ -488,8 +506,8 @@ input {
 
 .discard-stack {
   position: relative;
-  width: 120px;
-  height: 180px;
+  width: var(--cardW);
+  height: var(--cardH);
 }
 
 .discard-stack .uno-card {
@@ -511,8 +529,8 @@ input {
   place-items: center;
   gap: 0.4rem;
   position: relative;
-  width: 120px;
-  height: 200px;
+  width: var(--cardW);
+  height: calc(var(--cardH) + 32px);
   padding: 0;
 }
 
@@ -521,8 +539,8 @@ input {
 }
 
 .draw-stack .card-back {
-  width: 100px;
-  height: 150px;
+  width: var(--cardW);
+  height: var(--cardH);
   position: absolute;
   top: 0;
   left: 50%;
@@ -530,23 +548,28 @@ input {
 }
 
 .draw-stack .card-back.offset-1 {
-  transform: translate(calc(-50% + 6px), 6px) rotate(2deg);
+  transform: translate(calc(-50% + var(--stackOffset)), var(--stackOffset)) rotate(2deg);
   opacity: 0.9;
 }
 
 .draw-stack .card-back.offset-2 {
-  transform: translate(calc(-50% + 12px), 12px) rotate(-2deg);
+  transform: translate(calc(-50% + calc(var(--stackOffset) * 2)), calc(var(--stackOffset) * 2)) rotate(-2deg);
   opacity: 0.8;
 }
 
 .pile-label {
   position: absolute;
-  bottom: -26px;
+  bottom: -24px;
   left: 50%;
   transform: translateX(-50%);
   font-weight: 700;
   color: var(--text);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.table .uno-card.large {
+  width: var(--cardW);
+  height: var(--cardH);
 }
 
 .center-meta {
@@ -811,18 +834,18 @@ input {
   }
 
   .draw-stack .card-back {
-    width: 90px;
-    height: 135px;
+    width: var(--cardW);
+    height: var(--cardH);
   }
 
   .discard-stack {
-    width: 110px;
-    height: 165px;
+    width: var(--cardW);
+    height: var(--cardH);
   }
 
   .draw-stack {
-    width: 110px;
-    height: 190px;
+    width: var(--cardW);
+    height: calc(var(--cardH) + 28px);
   }
 }
 
@@ -833,6 +856,10 @@ input {
 
   .table {
     height: 50vh;
+    --cardW: clamp(48px, 18vw, 72px);
+    --cardH: calc(var(--cardW) * 1.45);
+    --pileGap: clamp(10px, 5vw, 18px);
+    --stackOffset: clamp(3px, 1.6vw, 7px);
   }
 
   .seat-inner {
@@ -870,32 +897,32 @@ input {
   }
 
   .center-area::after {
-    inset: 32% 34%;
+    inset: 36% 38%;
     opacity: 0.5;
   }
 
   .discard-stack {
-    width: 100px;
-    height: 150px;
+    width: var(--cardW);
+    height: var(--cardH);
   }
 
   .draw-stack {
-    width: 100px;
-    height: 170px;
+    width: var(--cardW);
+    height: calc(var(--cardH) + 22px);
   }
 
   .draw-stack .card-back {
-    width: 80px;
-    height: 120px;
+    width: var(--cardW);
+    height: var(--cardH);
   }
 
   .pile-label {
-    bottom: -20px;
+    bottom: -18px;
     font-size: 0.8rem;
   }
 
   .uno-card.large {
-    width: 90px;
-    height: 135px;
+    width: var(--cardW);
+    height: var(--cardH);
   }
 }

@@ -375,30 +375,32 @@ function App() {
           />
 
           <div className={`center-area ${game.currentColor || 'none'}`}>
-            <div className="pile-row">
-              <div className="pile-stack discard-stack">
-                <UnoCard card={game.discardTop} size="large" />
+            <div className="play-area">
+              <div className="pile-row">
+                <div className="pile-stack discard-stack">
+                  <UnoCard card={game.discardTop} size="large" />
+                </div>
+
+                <button
+                  className={`pile-stack draw-stack ${drawAnimating ? 'drawing' : ''}`}
+                  onClick={handleDraw}
+                  disabled={!canAct || !!drawnCardId}
+                >
+                  <CardBack className="stacked" />
+                  <CardBack className="stacked offset-1" />
+                  <CardBack className="stacked offset-2" />
+                  <span className="pile-label">Draw {game.drawDeckCount}</span>
+                </button>
               </div>
 
-              <button
-                className={`pile-stack draw-stack ${drawAnimating ? 'drawing' : ''}`}
-                onClick={handleDraw}
-                disabled={!canAct || !!drawnCardId}
-              >
-                <CardBack className="stacked" />
-                <CardBack className="stacked offset-1" />
-                <CardBack className="stacked offset-2" />
-                <span className="pile-label">Draw {game.drawDeckCount}</span>
-              </button>
-            </div>
-
-            <div className="center-meta">
-              <div className={`active-color ${game.currentColor}`}>
-                <span className="dot" />
-                {COLOR_LABELS[game.currentColor] || 'None'}
+              <div className="center-meta">
+                <div className={`active-color ${game.currentColor}`}>
+                  <span className="dot" />
+                  {COLOR_LABELS[game.currentColor] || 'None'}
+                </div>
+                <div className="direction-chip">{directionArrow}</div>
+                <div className="pile-counts">Discard {game.discardPileCount}</div>
               </div>
-              <div className="direction-chip">{directionArrow}</div>
-              <div className="pile-counts">Discard {game.discardPileCount}</div>
             </div>
           </div>
         </div>
