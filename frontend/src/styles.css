@@ -856,10 +856,14 @@ input {
 
   .table {
     height: 50vh;
-    --cardW: clamp(48px, 18vw, 72px);
+    --cardW: clamp(44px, 16vw, 64px);
     --cardH: calc(var(--cardW) * 1.45);
     --pileGap: clamp(10px, 5vw, 18px);
     --stackOffset: clamp(3px, 1.6vw, 7px);
+  }
+
+  .play-area {
+    transform: translateY(12px);
   }
 
   .seat-inner {
@@ -897,7 +901,7 @@ input {
   }
 
   .center-area::after {
-    inset: 36% 38%;
+    inset: 38% 40%;
     opacity: 0.5;
   }
 
@@ -917,7 +921,7 @@ input {
   }
 
   .pile-label {
-    bottom: -18px;
+    bottom: -14px;
     font-size: 0.8rem;
   }
 
