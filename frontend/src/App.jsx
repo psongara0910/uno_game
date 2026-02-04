@@ -377,8 +377,6 @@ function App() {
           <div className={`center-area ${game.currentColor || 'none'}`}>
             <div className="pile-row">
               <div className="pile-stack discard-stack">
-                <div className="pile-shadow" />
-                <div className="pile-shadow shadow-2" />
                 <UnoCard card={game.discardTop} size="large" />
               </div>
 
