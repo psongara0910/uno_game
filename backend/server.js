@@ -8,8 +8,8 @@ const { Server } = require('socket.io');
 const PORT = process.env.PORT || 3001;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || '*';
 const TURN_DELAY_MS = Number(process.env.TURN_DELAY_MS || 600);
-const BOT_THINK_MIN = Number(process.env.BOT_THINK_MIN || 500);
-const BOT_THINK_MAX = Number(process.env.BOT_THINK_MAX || 1200);
+const BOT_THINK_MIN = Number(process.env.BOT_THINK_MIN || 3000);
+const BOT_THINK_MAX = Number(process.env.BOT_THINK_MAX || 4000);
 const UNO_WINDOW_MS = Number(process.env.UNO_WINDOW_MS || 2000);
 const CHALLENGE_WINDOW_MS = Number(process.env.CHALLENGE_WINDOW_MS || 3000);
 const DISCONNECT_TIMEOUT_MS = Number(process.env.DISCONNECT_TIMEOUT_MS || 30000);
@@ -273,7 +273,7 @@ function maybeScheduleBot(lobby) {
   if (!player || !player.isBot) return;
 
   if (player.botTimer) clearTimeout(player.botTimer);
-  const delay = BOT_THINK_MIN + Math.random() * (BOT_THINK_MAX - BOT_THINK_MIN);
+  const delay = getBotDelay();
   player.botTimer = setTimeout(() => runBotTurn(lobby, player), delay);
 }
 
@@ -301,6 +301,10 @@ function runBotTurn(lobby, player) {
     chosenColor = chooseBotColor(player.hand);
   }
   handlePlay(lobby, player, chosen.id, chosenColor, true);
+}
+
+function getBotDelay() {
+  return BOT_THINK_MIN + Math.random() * (BOT_THINK_MAX - BOT_THINK_MIN);
 }
 
 function chooseBotCard(playable, hand, game) {
@@ -567,7 +571,7 @@ function startWild4Challenge(lobby, challengerIndex, playedById, legal) {
   sendState(lobby);
 
   if (challenger.isBot) {
-    const delay = BOT_THINK_MIN + Math.random() * (BOT_THINK_MAX - BOT_THINK_MIN);
+    const delay = getBotDelay();
     setTimeout(() => {
       const shouldChallenge = Math.random() < 0.35;
       resolveWild4Challenge(lobby, shouldChallenge);
@@ -636,7 +640,7 @@ function handleDraw(lobby, player, isBot = false) {
   } else if (player.isBot) {
     setTimeout(() => {
       handlePlay(lobby, player, card.id, card.type.startsWith('wild') ? chooseBotColor(player.hand) : null, true);
-    }, 300);
+    }, getBotDelay());
   }
 
   sendState(lobby);
