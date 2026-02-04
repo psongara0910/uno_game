@@ -253,10 +253,12 @@ input {
   padding-bottom: calc(clamp(8px, 2vw, 18px) + env(safe-area-inset-bottom));
   padding-left: calc(clamp(8px, 2vw, 18px) + env(safe-area-inset-left));
   padding-right: calc(clamp(8px, 2vw, 18px) + env(safe-area-inset-right));
-  --cardW: clamp(52px, 14vw, 88px);
+  --cardW: clamp(52px, 14vw, 82px);
   --cardH: calc(var(--cardW) * 1.45);
   --pileGap: clamp(10px, 3vw, 22px);
-  --stackOffset: clamp(4px, 1.2vw, 10px);
+  --stackOffset: clamp(2px, 0.8vw, 8px);
+  --centerShiftY: 0px;
+  --bottomInfoShiftY: 0px;
 }
 
 .table::before {
@@ -294,7 +296,7 @@ input {
 .seat.south {
   bottom: 0.6rem;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, var(--bottomInfoShiftY));
 }
 
 .seat.north {
@@ -467,6 +469,7 @@ input {
   justify-content: center;
   gap: clamp(6px, 1.6vw, 12px);
   width: min(100%, 340px);
+  transform: translateY(var(--centerShiftY));
 }
 
 .center-area::after {
@@ -501,7 +504,7 @@ input {
   gap: var(--pileGap);
   position: relative;
   z-index: 2;
-  width: 100%;
+  width: min(100%, calc(var(--cardW) * 2 + var(--pileGap)));
 }
 
 .discard-stack {
@@ -856,10 +859,10 @@ input {
 
   .table {
     height: 50vh;
-    --cardW: clamp(44px, 16vw, 64px);
+    --cardW: clamp(42px, 15vw, 60px);
     --cardH: calc(var(--cardW) * 1.45);
-    --pileGap: clamp(10px, 5vw, 18px);
-    --stackOffset: clamp(3px, 1.6vw, 7px);
+    --pileGap: clamp(10px, 4vw, 16px);
+    --stackOffset: clamp(2px, 1.2vw, 6px);
   }
 
   .play-area {
@@ -928,5 +931,16 @@ input {
   .uno-card.large {
     width: var(--cardW);
     height: var(--cardH);
+  }
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
+  .table {
+    --centerShiftY: clamp(20px, 4vh, 46px);
+    --bottomInfoShiftY: clamp(10px, 2.4vh, 22px);
+  }
+
+  .direction-indicator {
+    display: none;
   }
 }
